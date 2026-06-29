@@ -1,0 +1,21 @@
+# Зависимости Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Чувствительные данные
+.env
+
+# Front
+build/
+dist/
+
+# Python
+__pycache__/
+venv/
+env/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/

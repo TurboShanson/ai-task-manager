@@ -1,7 +1,29 @@
+const axios = require('axios');
 const { Task } = require('../models');
 
 const VALID_STATUSES = ['new', 'in_progress', 'done'];
 const VALID_PRIORITIES = ['low', 'medium', 'high'];
+
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL;
+const DEFAULT_ANALYSIS = { priority: 'medium', category: 'general' };
+
+async function analyzeTask(title, description) {
+  if (!AI_SERVICE_URL) {
+    return DEFAULT_ANALYSIS;
+  }
+
+  try {
+    const { data } = await axios.post(`${AI_SERVICE_URL}/analyze`, { title, description }, { timeout: 3000 });
+
+    const priority = VALID_PRIORITIES.includes(data.priority) ? data.priority : DEFAULT_ANALYSIS.priority;
+    const category = data.category || DEFAULT_ANALYSIS.category;
+
+    return { priority, category };
+  } catch (error) {
+    console.error('Ошибка обращения к сервису анализа задач:', error.message);
+    return DEFAULT_ANALYSIS;
+  }
+}
 
 exports.getTasks = async (req, res) => {
   try {
@@ -19,7 +41,7 @@ exports.getTasks = async (req, res) => {
 
 exports.createTask = async (req, res) => {
   try {
-    const { title, description, status, priority, category } = req.body;
+    const { title, description, status } = req.body;
 
     if (!title) {
       return res.status(400).json({ message: 'Название задачи обязательно' });
@@ -29,9 +51,7 @@ exports.createTask = async (req, res) => {
       return res.status(400).json({ message: 'Недопустимый статус задачи' });
     }
 
-    if (priority && !VALID_PRIORITIES.includes(priority)) {
-      return res.status(400).json({ message: 'Недопустимый приоритет задачи' });
-    }
+    const { priority, category } = await analyzeTask(title, description);
 
     const task = await Task.create({
       userId: req.user.id,

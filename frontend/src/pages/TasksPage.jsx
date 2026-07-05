@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '../api';
 
 const STATUSES = ['new', 'in_progress', 'done'];
-const PRIORITIES = ['low', 'medium', 'high'];
 
 export default function TasksPage() {
   const navigate = useNavigate();
@@ -15,13 +13,22 @@ export default function TasksPage() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('medium');
-  const [category, setCategory] = useState('general');
+
+  const handleUnauthorized = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
 
   const loadTasks = async () => {
     const response = await fetch(`${API_URL}/tasks`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (response.status === 401) {
+      handleUnauthorized();
+      return;
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -50,8 +57,14 @@ export default function TasksPage() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ title, description, priority, category }),
+      body: JSON.stringify({ title, description }),
     });
+
+    if (response.status === 401) {
+      handleUnauthorized();
+      return;
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -61,13 +74,11 @@ export default function TasksPage() {
 
     setTitle('');
     setDescription('');
-    setPriority('medium');
-    setCategory('general');
     loadTasks();
   };
 
   const handleStatusChange = async (taskId, status) => {
-    await fetch(`${API_URL}/tasks/${taskId}`, {
+    const response = await fetch(`${API_URL}/tasks/${taskId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -75,14 +86,26 @@ export default function TasksPage() {
       },
       body: JSON.stringify({ status }),
     });
+
+    if (response.status === 401) {
+      handleUnauthorized();
+      return;
+    }
+
     loadTasks();
   };
 
   const handleDelete = async (taskId) => {
-    await fetch(`${API_URL}/tasks/${taskId}`, {
+    const response = await fetch(`${API_URL}/tasks/${taskId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (response.status === 401) {
+      handleUnauthorized();
+      return;
+    }
+
     loadTasks();
   };
 
@@ -111,17 +134,6 @@ export default function TasksPage() {
           placeholder="Описание"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-        />
-        <select value={priority} onChange={(e) => setPriority(e.target.value)}>
-          {PRIORITIES.map((value) => (
-            <option key={value} value={value}>{value}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="Категория"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
         />
         <button type="submit">Добавить</button>
       </form>

@@ -20,7 +20,7 @@ npm run dev
 ### AI-сервис:
 cd analysis-service
 python -m venv venv
-venv\Scripts\activate   (Linux/Mac: source venv/bin/activate)
+venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 Поднимется сервис на http://localhost:8000, эндпоинт POST /analyze принимает { "title": "...", "description": "..." } и возвращает { "priority": "...", "category": "..." }

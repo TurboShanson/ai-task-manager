@@ -43,6 +43,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(50),
       defaultValue: 'general',
     },
+    dueDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: 'due_date'
+    },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,

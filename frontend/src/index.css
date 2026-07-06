@@ -89,6 +89,22 @@ button:hover {
   border-bottom: 1px solid #e5e5e8;
 }
 
+.task-title {
+  background: none;
+  border: none;
+  color: #1a1a1a;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: #c0c0c8;
+  text-underline-offset: 3px;
+}
+
+.task-description-row td {
+  background: #fafafc;
+  color: #55555c;
+}
+
 .error {
   color: #d32f2f;
 }

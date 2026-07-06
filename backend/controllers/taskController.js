@@ -41,7 +41,7 @@ exports.getTasks = async (req, res) => {
 
 exports.createTask = async (req, res) => {
   try {
-    const { title, description, status } = req.body;
+    const { title, description, status, dueDate } = req.body;
 
     if (!title) {
       return res.status(400).json({ message: 'Название задачи обязательно' });
@@ -49,6 +49,10 @@ exports.createTask = async (req, res) => {
 
     if (status && !VALID_STATUSES.includes(status)) {
       return res.status(400).json({ message: 'Недопустимый статус задачи' });
+    }
+
+    if (dueDate && isNaN(Date.parse(dueDate))) {
+      return res.status(400).json({ message: 'Недопустимая дата окончания задачи' });
     }
 
     const { priority, category } = await analyzeTask(title, description);
@@ -60,6 +64,7 @@ exports.createTask = async (req, res) => {
       status,
       priority,
       category,
+      dueDate: dueDate || null,
     });
 
     return res.status(201).json(task);
@@ -72,7 +77,7 @@ exports.createTask = async (req, res) => {
 exports.updateTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, status, priority, category } = req.body;
+    const { title, description, status, priority, category, dueDate } = req.body;
 
     if (status && !VALID_STATUSES.includes(status)) {
       return res.status(400).json({ message: 'Недопустимый статус задачи' });
@@ -80,6 +85,10 @@ exports.updateTask = async (req, res) => {
 
     if (priority && !VALID_PRIORITIES.includes(priority)) {
       return res.status(400).json({ message: 'Недопустимый приоритет задачи' });
+    }
+
+    if (dueDate && isNaN(Date.parse(dueDate))) {
+      return res.status(400).json({ message: 'Недопустимая дата окончания задачи' });
     }
 
     const task = await Task.findOne({ where: { id, userId: req.user.id } });
@@ -92,6 +101,7 @@ exports.updateTask = async (req, res) => {
     if (status !== undefined) task.status = status;
     if (priority !== undefined) task.priority = priority;
     if (category !== undefined) task.category = category;
+    if (dueDate !== undefined) task.dueDate = dueDate || null;
 
     await task.save();
 

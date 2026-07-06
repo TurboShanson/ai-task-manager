@@ -1,10 +1,25 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from '../api';
 
-const API_URL = 'http://localhost:5000/api';
+const STATUS_LABELS = {
+  new: 'Новая',
+  in_progress: 'В работе',
+  done: 'Выполнена',
+};
 
-const STATUSES = ['new', 'in_progress', 'done'];
-const PRIORITIES = ['low', 'medium', 'high'];
+const PRIORITY_LABELS = {
+  low: 'Низкий',
+  medium: 'Средний',
+  high: 'Высокий',
+};
+
+const CATEGORY_LABELS = {
+  business: 'Бизнес',
+  study: 'Учёба',
+  personal: 'Личное',
+  general: 'Общее',
+};
 
 export default function TasksPage() {
   const navigate = useNavigate();
@@ -12,16 +27,27 @@ export default function TasksPage() {
 
   const [tasks, setTasks] = useState([]);
   const [error, setError] = useState('');
+  const [expandedTaskId, setExpandedTaskId] = useState(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('medium');
-  const [category, setCategory] = useState('general');
+  const [dueDate, setDueDate] = useState('');
+
+  const handleUnauthorized = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
 
   const loadTasks = async () => {
     const response = await fetch(`${API_URL}/tasks`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (response.status === 401) {
+      handleUnauthorized();
+      return;
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -50,8 +76,14 @@ export default function TasksPage() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ title, description, priority, category }),
+      body: JSON.stringify({ title, description, dueDate }),
     });
+
+    if (response.status === 401) {
+      handleUnauthorized();
+      return;
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -61,13 +93,12 @@ export default function TasksPage() {
 
     setTitle('');
     setDescription('');
-    setPriority('medium');
-    setCategory('general');
+    setDueDate('');
     loadTasks();
   };
 
   const handleStatusChange = async (taskId, status) => {
-    await fetch(`${API_URL}/tasks/${taskId}`, {
+    const response = await fetch(`${API_URL}/tasks/${taskId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -75,14 +106,26 @@ export default function TasksPage() {
       },
       body: JSON.stringify({ status }),
     });
+
+    if (response.status === 401) {
+      handleUnauthorized();
+      return;
+    }
+
     loadTasks();
   };
 
   const handleDelete = async (taskId) => {
-    await fetch(`${API_URL}/tasks/${taskId}`, {
+    const response = await fetch(`${API_URL}/tasks/${taskId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (response.status === 401) {
+      handleUnauthorized();
+      return;
+    }
+
     loadTasks();
   };
 
@@ -112,16 +155,11 @@ export default function TasksPage() {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-        <select value={priority} onChange={(e) => setPriority(e.target.value)}>
-          {PRIORITIES.map((value) => (
-            <option key={value} value={value}>{value}</option>
-          ))}
-        </select>
         <input
-          type="text"
-          placeholder="Категория"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          type="date"
+          title="Срок задачи"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
         />
         <button type="submit">Добавить</button>
       </form>
@@ -135,31 +173,50 @@ export default function TasksPage() {
             <th>Статус</th>
             <th>Приоритет</th>
             <th>Категория</th>
+            <th>Срок</th>
             <th>Создана</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {tasks.map((task) => (
-            <tr key={task.id}>
-              <td>{task.title}</td>
-              <td>
-                <select
-                  value={task.status}
-                  onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                >
-                  {STATUSES.map((value) => (
-                    <option key={value} value={value}>{value}</option>
-                  ))}
-                </select>
-              </td>
-              <td>{task.priority}</td>
-              <td>{task.category}</td>
-              <td>{new Date(task.createdAt).toLocaleDateString()}</td>
-              <td>
-                <button type="button" onClick={() => handleDelete(task.id)}>Удалить</button>
-              </td>
-            </tr>
+            <Fragment key={task.id}>
+              <tr>
+                <td>
+                  <button
+                    type="button"
+                    className="task-title"
+                    onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                  >
+                    {task.title}
+                  </button>
+                </td>
+                <td>
+                  <select
+                    value={task.status}
+                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                  >
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </td>
+                <td>{PRIORITY_LABELS[task.priority] || task.priority}</td>
+                <td>{CATEGORY_LABELS[task.category] || task.category}</td>
+                <td>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}</td>
+                <td>{new Date(task.createdAt).toLocaleDateString()}</td>
+                <td>
+                  <button type="button" onClick={() => handleDelete(task.id)}>Удалить</button>
+                </td>
+              </tr>
+              {expandedTaskId === task.id && (
+                <tr className="task-description-row">
+                  <td colSpan={7}>
+                    {task.description || 'Описание отсутствует'}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>

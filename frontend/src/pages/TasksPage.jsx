@@ -21,6 +21,8 @@ const CATEGORY_LABELS = {
   general: 'Общее',
 };
 
+const formatDate = (value) => new Date(value).toLocaleDateString('ru-RU');
+
 export default function TasksPage() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
@@ -156,10 +158,13 @@ export default function TasksPage() {
           onChange={(e) => setDescription(e.target.value)}
         />
         <input
-          type="date"
+          type="text"
+          placeholder="Срок выполнения"
           title="Срок задачи"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
+          onFocus={(e) => { e.target.type = 'date'; }}
+          onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
         />
         <button type="submit">Добавить</button>
       </form>
@@ -203,8 +208,8 @@ export default function TasksPage() {
                 </td>
                 <td>{PRIORITY_LABELS[task.priority] || task.priority}</td>
                 <td>{CATEGORY_LABELS[task.category] || task.category}</td>
-                <td>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}</td>
-                <td>{new Date(task.createdAt).toLocaleDateString()}</td>
+                <td>{task.dueDate ? formatDate(task.dueDate) : '—'}</td>
+                <td>{formatDate(task.createdAt)}</td>
                 <td>
                   <button type="button" onClick={() => handleDelete(task.id)}>Удалить</button>
                 </td>

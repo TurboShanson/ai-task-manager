@@ -1,7 +1,19 @@
 :root {
-  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
-  color: #1a1a1a;
-  background: #f5f5f7;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --border: #e3e5ea;
+  --text: #1c1d21;
+  --text-muted: #71737c;
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(28, 29, 33, 0.05), 0 4px 16px rgba(28, 29, 33, 0.06);
+
+  font: 15px/1.55 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
 }
 
 body {
@@ -11,18 +23,96 @@ body {
 #root {
   max-width: 960px;
   margin: 0 auto;
-  padding: 24px 16px;
+  padding: 32px 16px;
 }
 
 h1 {
-  font-size: 28px;
-  margin: 0 0 24px;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0;
 }
 
+/* --- Формы и контролы --- */
+
+input,
+select,
+button {
+  font: inherit;
+  color: inherit;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+input::placeholder {
+  color: var(--text-muted);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+button {
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-weight: 550;
+  transition: background 0.15s ease;
+}
+
+button:hover {
+  background: #4338ca;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.btn-ghost:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  font-weight: 500;
+  padding: 6px 10px;
+}
+
+.btn-danger:hover {
+  background: var(--danger-soft);
+}
+
+/* --- Страницы входа и регистрации --- */
+
 .auth-page {
-  max-width: 360px;
-  margin: 48px auto;
+  max-width: 380px;
+  margin: 10vh auto 0;
+  padding: 36px 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   text-align: center;
+}
+
+.auth-page h1 {
+  margin-bottom: 24px;
 }
 
 .auth-page form {
@@ -31,80 +121,192 @@ h1 {
   gap: 12px;
 }
 
+.auth-page p {
+  margin: 20px 0 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.auth-page a {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.auth-page a:hover {
+  text-decoration: underline;
+}
+
+/* --- Страница задач --- */
+
 .tasks-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-}
-
-.tasks-header > div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .task-form {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 24px;
+  padding: 14px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .task-form input {
   flex: 1;
-  min-width: 140px;
+  min-width: 150px;
 }
 
-input,
-select,
-button {
-  font: inherit;
-  padding: 8px 10px;
-  border: 1px solid #d0d0d5;
+.task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.task-card:hover {
+  box-shadow: 0 2px 4px rgba(28, 29, 33, 0.06), 0 8px 24px rgba(28, 29, 33, 0.1);
+  transform: translateY(-1px);
+}
+
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.task-card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.btn-close {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.4;
   border-radius: 6px;
 }
 
-button {
+.btn-close:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.task-card-description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   cursor: pointer;
-  background: #1a1a1a;
-  color: #fff;
-  border: none;
 }
 
-button:hover {
-  opacity: 0.85;
+.task-card-description.expanded {
+  display: block;
+  -webkit-line-clamp: none;
 }
 
-.tasks-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
+.task-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.tasks-table th,
-.tasks-table td {
-  text-align: left;
-  padding: 10px 12px;
-  border-bottom: 1px solid #e5e5e8;
+.task-card-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
-.task-title {
-  background: none;
-  border: none;
-  color: #1a1a1a;
-  padding: 0;
-  text-align: left;
-  text-decoration: underline;
-  text-decoration-color: #c0c0c8;
-  text-underline-offset: 3px;
+.task-card-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-align: right;
 }
 
-.task-description-row td {
-  background: #fafafc;
-  color: #55555c;
+.status-select {
+  padding: 5px 8px;
+  font-size: 14px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.priority-high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.priority-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.priority-low {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.badge-category {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.empty-state {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
 }
 
 .error {
-  color: #d32f2f;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--danger-soft);
+  border: 1px solid #fecaca;
+  color: var(--danger);
+  font-size: 14px;
 }

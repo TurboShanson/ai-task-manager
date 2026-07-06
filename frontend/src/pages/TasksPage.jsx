@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../api';
 
@@ -140,7 +140,7 @@ export default function TasksPage() {
     <div className="tasks-page">
       <header className="tasks-header">
         <h1>Мои задачи</h1>
-        <button type="button" onClick={handleLogout}>Выйти</button>
+        <button type="button" className="btn-ghost" onClick={handleLogout}>Выйти</button>
       </header>
 
       <form className="task-form" onSubmit={handleCreate}>
@@ -171,60 +171,60 @@ export default function TasksPage() {
 
       {error && <p className="error">{error}</p>}
 
-      <table className="tasks-table">
-        <thead>
-          <tr>
-            <th>Название</th>
-            <th>Статус</th>
-            <th>Приоритет</th>
-            <th>Категория</th>
-            <th>Срок</th>
-            <th>Создана</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
+      {tasks.length === 0 ? (
+        <p className="empty-state">Задач пока нет — добавьте первую в форме выше.</p>
+      ) : (
+        <div className="task-grid">
           {tasks.map((task) => (
-            <Fragment key={task.id}>
-              <tr>
-                <td>
-                  <button
-                    type="button"
-                    className="task-title"
-                    onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
-                  >
-                    {task.title}
-                  </button>
-                </td>
-                <td>
-                  <select
-                    value={task.status}
-                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                  >
-                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>{PRIORITY_LABELS[task.priority] || task.priority}</td>
-                <td>{CATEGORY_LABELS[task.category] || task.category}</td>
-                <td>{task.dueDate ? formatDate(task.dueDate) : '—'}</td>
-                <td>{formatDate(task.createdAt)}</td>
-                <td>
-                  <button type="button" onClick={() => handleDelete(task.id)}>Удалить</button>
-                </td>
-              </tr>
-              {expandedTaskId === task.id && (
-                <tr className="task-description-row">
-                  <td colSpan={7}>
-                    {task.description || 'Описание отсутствует'}
-                  </td>
-                </tr>
-              )}
-            </Fragment>
+            <article className="task-card" key={task.id}>
+              <header className="task-card-header">
+                <h3>{task.title}</h3>
+                <button
+                  type="button"
+                  className="btn-close"
+                  title="Удалить задачу"
+                  onClick={() => handleDelete(task.id)}
+                >
+                  ✕
+                </button>
+              </header>
+
+              <p
+                className={`task-card-description${expandedTaskId === task.id ? ' expanded' : ''}`}
+                title="Показать описание полностью"
+                onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+              >
+                {task.description || 'Описание отсутствует'}
+              </p>
+
+              <div className="task-card-badges">
+                <span className={`badge priority-${task.priority}`}>
+                  {PRIORITY_LABELS[task.priority] || task.priority}
+                </span>
+                <span className="badge badge-category">
+                  {CATEGORY_LABELS[task.category] || task.category}
+                </span>
+              </div>
+
+              <footer className="task-card-footer">
+                <select
+                  className="status-select"
+                  value={task.status}
+                  onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                >
+                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+                <div className="task-card-dates">
+                  <span>Срок: {task.dueDate ? formatDate(task.dueDate) : '—'}</span>
+                  <span>Создана: {formatDate(task.createdAt)}</span>
+                </div>
+              </footer>
+            </article>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
   );
 }

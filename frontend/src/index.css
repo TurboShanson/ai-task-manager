@@ -45,8 +45,14 @@ button {
   background: var(--surface);
 }
 
+/* Описание растёт вместе с текстом, без ручки ресайза; после max-height — тонкий скролл */
 textarea {
-  resize: vertical;
+  resize: none;
+  min-height: 96px;
+  max-height: 45vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c4c4c4 transparent;
 }
 
 input::placeholder,
@@ -185,7 +191,8 @@ button:focus-visible {
   font-size: 20px;
 }
 
-.sidebar-filters {
+.sidebar-filters,
+.sidebar-settings {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -193,7 +200,22 @@ button:focus-visible {
   border-top: 1px solid var(--border);
 }
 
-.sidebar-filters h2 {
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.settings-toggle input {
+  width: auto;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.sidebar-filters h2,
+.sidebar-settings h2 {
   margin: 0;
   font-size: 12px;
   font-weight: 600;
@@ -246,6 +268,35 @@ button:focus-visible {
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.view-toggle {
+  display: inline-flex;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.view-toggle button {
+  padding: 7px 12px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.view-toggle button:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.view-toggle button.active,
+.view-toggle button.active:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 .found-count {
@@ -357,11 +408,21 @@ button:focus-visible {
   color: var(--danger);
 }
 
+.task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
 .kanban {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   align-items: start;
+}
+
+.kanban .task-card {
+  cursor: grab;
 }
 
 .kanban-column {
@@ -466,7 +527,6 @@ button:focus-visible {
 }
 
 .task-card {
-  cursor: grab;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -481,6 +541,27 @@ button:focus-visible {
 .task-card:hover {
   box-shadow: 0 2px 4px rgba(28, 29, 33, 0.06), 0 8px 24px rgba(28, 29, 33, 0.1);
   transform: translateY(-1px);
+}
+
+/* Подсветка дедлайнов — функциональные цвета, как у тегов */
+.task-card.due-warning {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px #f59e0b, 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.task-card.due-danger {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 1px #dc2626, 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.task-card.due-warning .days-left {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.task-card.due-danger .days-left {
+  color: #dc2626;
+  font-weight: 600;
 }
 
 .task-card-header {
@@ -543,7 +624,7 @@ button:focus-visible {
   margin-top: auto;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 8px;
   padding-top: 12px;
@@ -554,6 +635,18 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.task-card-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.days-left {
   font-size: 12.5px;
   color: var(--text-muted);
 }
@@ -593,6 +686,11 @@ button:focus-visible {
   color: #4f46e5;
 }
 
+.badge-status {
+  background: #e8e8e8;
+  color: #3d3d3d;
+}
+
 .empty-state {
   padding: 40px 16px;
   text-align: center;
@@ -610,6 +708,41 @@ button:focus-visible {
   border: 1px solid #fecaca;
   color: var(--danger);
   font-size: 14px;
+}
+
+/* --- Правая панель задачи (создание и просмотр) --- */
+
+.task-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  box-sizing: border-box;
+  width: 400px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  overflow-y: auto;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.12);
+  animation: task-panel-slide 0.2s ease;
+}
+
+@keyframes task-panel-slide {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* футер панели прижат к низу экрана */
+.task-panel .modal-footer {
+  margin-top: auto;
 }
 
 /* --- Модальные окна --- */

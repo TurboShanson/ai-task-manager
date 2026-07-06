@@ -45,6 +45,22 @@ const SORT_COMPARATORS = {
 
 const formatDate = (value) => new Date(value).toLocaleDateString('ru-RU');
 
+// Сколько полных дней осталось до срока: 0 — сегодня, отрицательное — просрочено
+const getDaysLeft = (dueDate) => {
+  if (!dueDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(`${dueDate}T00:00:00`);
+  return Math.round((due - today) / 86400000);
+};
+
+const formatDaysLeft = (daysLeft) => {
+  if (daysLeft === null) return '';
+  if (daysLeft > 0) return `осталось ${daysLeft} дн.`;
+  if (daysLeft === 0) return 'срок сегодня';
+  return `просрочено на ${Math.abs(daysLeft)} дн.`;
+};
+
 const readStoredUser = () => {
   try {
     return JSON.parse(localStorage.getItem('user'));
@@ -63,7 +79,14 @@ export default function TasksPage() {
   const [sortKeys, setSortKeys] = useState([]);
   const [filters, setFilters] = useState({ status: '', priority: '', category: '', dueBefore: '' });
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [view, setView] = useState(() => localStorage.getItem('tasksView') || 'grid');
   const [dragOverStatus, setDragOverStatus] = useState(null);
+  const [deadlineEnabled, setDeadlineEnabled] = useState(
+    () => localStorage.getItem('deadlineHighlight') !== 'off'
+  );
+  const [deadlineDays, setDeadlineDays] = useState(
+    () => localStorage.getItem('deadlineDays') || '2'
+  );
 
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
@@ -148,13 +171,20 @@ export default function TasksPage() {
     loadTasks();
   }, []);
 
-  const openCreateModal = (status = 'new') => {
+  // Справа открыта либо панель создания, либо панель просмотра — не обе сразу
+  const openCreatePanel = (status = 'new') => {
+    setSelectedTaskId(null);
     setTitle('');
     setDescription('');
     setDueDate('');
     setCreateStatus(status);
     setFormError('');
     setCreateOpen(true);
+  };
+
+  const openTaskPanel = (taskId) => {
+    setCreateOpen(false);
+    setSelectedTaskId(taskId);
   };
 
   const handleCreate = async (event) => {
@@ -242,6 +272,103 @@ export default function TasksPage() {
     navigate('/login');
   };
 
+  const switchView = (nextView) => {
+    setView(nextView);
+    localStorage.setItem('tasksView', nextView);
+  };
+
+  const updateDeadlineEnabled = (enabled) => {
+    setDeadlineEnabled(enabled);
+    localStorage.setItem('deadlineHighlight', enabled ? 'on' : 'off');
+  };
+
+  // Пустое поле разрешено во время набора, чтобы можно было стереть значение и ввести новое
+  const updateDeadlineDays = (value) => {
+    if (value === '') {
+      setDeadlineDays('');
+      return;
+    }
+    const days = Math.max(1, Math.floor(Number(value)) || 1);
+    setDeadlineDays(String(days));
+    localStorage.setItem('deadlineDays', String(days));
+  };
+
+  const normalizeDeadlineDays = () => {
+    if (deadlineDays === '') {
+      setDeadlineDays('2');
+      localStorage.setItem('deadlineDays', '2');
+    }
+  };
+
+  // Класс подсветки рамки: жёлтая — срок близко, красная — сегодня или просрочено
+  const getDeadlineClass = (task) => {
+    if (!deadlineEnabled || !task.dueDate || task.status === 'done') return '';
+    const threshold = Number(deadlineDays) || 2;
+    const daysLeft = getDaysLeft(task.dueDate);
+    if (daysLeft <= 0) return ' due-danger';
+    if (daysLeft <= threshold) return ' due-warning';
+    return '';
+  };
+
+  const renderTaskCard = (task) => (
+    <article
+      className={`task-card${getDeadlineClass(task)}`}
+      key={task.id}
+      draggable={view === 'kanban'}
+      onDragStart={(e) => handleDragStart(e, task.id)}
+    >
+      <header className="task-card-header">
+        <h3 title="Открыть задачу" onClick={() => openTaskPanel(task.id)}>
+          {task.title}
+        </h3>
+        <button
+          type="button"
+          className="btn-close"
+          title="Удалить задачу"
+          onClick={() => handleDelete(task.id)}
+        >
+          ✕
+        </button>
+      </header>
+
+      <p
+        className="task-card-description"
+        title="Открыть задачу"
+        onClick={() => openTaskPanel(task.id)}
+      >
+        {task.description || 'Описание отсутствует'}
+      </p>
+
+      <footer className="task-card-footer">
+        <div className="task-card-dates">
+          <span>Срок: {task.dueDate ? formatDate(task.dueDate) : '—'}</span>
+          {view === 'grid' && task.dueDate && (
+            <span className="days-left">{formatDaysLeft(getDaysLeft(task.dueDate))}</span>
+          )}
+          <span>Создана: {formatDate(task.createdAt)}</span>
+        </div>
+        <div className="task-card-meta">
+          {view === 'kanban' && task.dueDate && (
+            <span className="days-left">{formatDaysLeft(getDaysLeft(task.dueDate))}</span>
+          )}
+          <div className="task-card-badges">
+            {view === 'grid' && (
+              <span className="badge badge-status">
+                {STATUS_LABELS[task.status] || task.status}
+              </span>
+            )}
+            <span className={`badge priority-${task.priority}`}>
+              {PRIORITY_LABELS[task.priority] || task.priority}
+            </span>
+            <span className="badge badge-category">
+              {CATEGORY_LABELS[task.category] || task.category}
+            </span>
+          </div>
+        </div>
+      </footer>
+    </article>
+  );
+
   return (
     <div className="tasks-layout">
       <aside className={`sidebar${isSidebarOpen ? '' : ' collapsed'}`}>
@@ -293,6 +420,30 @@ export default function TasksPage() {
           )}
         </div>
 
+        <div className="sidebar-settings">
+          <h2>Настройки</h2>
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={deadlineEnabled}
+              onChange={(e) => updateDeadlineEnabled(e.target.checked)}
+            />
+            <span>Подсветка дедлайнов</span>
+          </label>
+          {deadlineEnabled && (
+            <label className="filter-field">
+              <span>Предупреждать за (дней)</span>
+              <input
+                type="number"
+                min="1"
+                value={deadlineDays}
+                onChange={(e) => updateDeadlineDays(e.target.value)}
+                onBlur={normalizeDeadlineDays}
+              />
+            </label>
+          )}
+        </div>
+
         <div className="sidebar-footer">
           {user?.username && <span className="user-name">{user.username}</span>}
           <button type="button" onClick={() => setLogoutConfirmOpen(true)}>Выйти</button>
@@ -309,6 +460,22 @@ export default function TasksPage() {
           >
             ☰
           </button>
+          <div className="view-toggle">
+            <button
+              type="button"
+              className={view === 'grid' ? 'active' : ''}
+              onClick={() => switchView('grid')}
+            >
+              Сетка
+            </button>
+            <button
+              type="button"
+              className={view === 'kanban' ? 'active' : ''}
+              onClick={() => switchView('kanban')}
+            >
+              Канбан
+            </button>
+          </div>
           {tasks.length > 0 && (
             <div className="sort-bar" title="Порядок нажатия определяет важность критерия">
               <span className="sort-label">Сортировка:</span>
@@ -336,7 +503,7 @@ export default function TasksPage() {
           {hasActiveFilters && tasks.length > 0 && (
             <span className="found-count">Найдено: {sortedTasks.length}</span>
           )}
-          <button type="button" className="btn-add" onClick={() => openCreateModal()}>
+          <button type="button" className="btn-add" onClick={() => openCreatePanel()}>
             Добавить задачу
           </button>
         </div>
@@ -347,6 +514,10 @@ export default function TasksPage() {
           <p className="empty-state">Задач пока нет — нажмите «Добавить задачу», чтобы создать первую.</p>
         ) : sortedTasks.length === 0 ? (
           <p className="empty-state">По выбранным фильтрам ничего не найдено.</p>
+        ) : view === 'grid' ? (
+          <div className="task-grid">
+            {sortedTasks.map(renderTaskCard)}
+          </div>
         ) : (
           <div className="kanban">
             {Object.entries(STATUS_LABELS).map(([status, statusLabel]) => {
@@ -370,51 +541,7 @@ export default function TasksPage() {
                   </header>
 
                   <div className="kanban-cards">
-                    {columnTasks.map((task) => (
-                      <article
-                        className="task-card"
-                        key={task.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, task.id)}
-                      >
-                        <header className="task-card-header">
-                          <h3 title="Открыть задачу" onClick={() => setSelectedTaskId(task.id)}>
-                            {task.title}
-                          </h3>
-                          <button
-                            type="button"
-                            className="btn-close"
-                            title="Удалить задачу"
-                            onClick={() => handleDelete(task.id)}
-                          >
-                            ✕
-                          </button>
-                        </header>
-
-                        <p
-                          className="task-card-description"
-                          title="Открыть задачу"
-                          onClick={() => setSelectedTaskId(task.id)}
-                        >
-                          {task.description || 'Описание отсутствует'}
-                        </p>
-
-                        <footer className="task-card-footer">
-                          <div className="task-card-dates">
-                            <span>Срок: {task.dueDate ? formatDate(task.dueDate) : '—'}</span>
-                            <span>Создана: {formatDate(task.createdAt)}</span>
-                          </div>
-                          <div className="task-card-badges">
-                            <span className={`badge priority-${task.priority}`}>
-                              {PRIORITY_LABELS[task.priority] || task.priority}
-                            </span>
-                            <span className="badge badge-category">
-                              {CATEGORY_LABELS[task.category] || task.category}
-                            </span>
-                          </div>
-                        </footer>
-                      </article>
-                    ))}
+                    {columnTasks.map(renderTaskCard)}
                     {columnTasks.length === 0 && (
                       <p className="kanban-empty">Перетащите задачу сюда</p>
                     )}
@@ -425,7 +552,7 @@ export default function TasksPage() {
                       type="button"
                       className="kanban-add"
                       title={`Добавить задачу в «${statusLabel}»`}
-                      onClick={() => openCreateModal(status)}
+                      onClick={() => openCreatePanel(status)}
                     >
                       +
                     </button>
@@ -438,105 +565,108 @@ export default function TasksPage() {
       </main>
 
       {isCreateOpen && (
-        <div className="modal-overlay" onClick={() => setCreateOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <header className="modal-header">
-              <div>
-                <h2>Новая задача</h2>
-                <p className="modal-subtitle">Колонка: {STATUS_LABELS[createStatus]}</p>
-              </div>
-              <button
-                type="button"
-                className="btn-close"
-                title="Закрыть"
-                onClick={() => setCreateOpen(false)}
-              >
-                ✕
-              </button>
-            </header>
+        <aside className="task-panel">
+          <header className="modal-header">
+            <div>
+              <h2>Новая задача</h2>
+              <p className="modal-subtitle">Колонка: {STATUS_LABELS[createStatus]}</p>
+            </div>
+            <button
+              type="button"
+              className="btn-close"
+              title="Закрыть"
+              onClick={() => setCreateOpen(false)}
+            >
+              ✕
+            </button>
+          </header>
 
-            <form className="modal-form" onSubmit={handleCreate}>
-              <input
-                type="text"
-                placeholder="Название задачи"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
-              <textarea
-                rows={4}
-                placeholder="Описание"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Срок выполнения"
-                title="Срок задачи"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                onFocus={(e) => { e.target.type = 'date'; }}
-                onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
-              />
-              {formError && <p className="error">{formError}</p>}
-              <button type="submit">Добавить</button>
-            </form>
-          </div>
-        </div>
+          <form className="modal-form" onSubmit={handleCreate}>
+            <input
+              type="text"
+              placeholder="Название задачи"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+            <textarea
+              rows={4}
+              placeholder="Описание"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onInput={(e) => {
+                e.target.style.height = 'auto';
+                e.target.style.height = `${e.target.scrollHeight + 2}px`;
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Срок выполнения"
+              title="Срок задачи"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              onFocus={(e) => { e.target.type = 'date'; }}
+              onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+            />
+            {formError && <p className="error">{formError}</p>}
+            <button type="submit">Добавить</button>
+          </form>
+        </aside>
       )}
 
       {selectedTask && (
-        <div className="modal-overlay" onClick={() => setSelectedTaskId(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <header className="modal-header">
-              <h2>{selectedTask.title}</h2>
-              <button
-                type="button"
-                className="btn-close"
-                title="Закрыть"
-                onClick={() => setSelectedTaskId(null)}
-              >
-                ✕
-              </button>
-            </header>
+        <aside className="task-panel">
+          <header className="modal-header">
+            <h2>{selectedTask.title}</h2>
+            <button
+              type="button"
+              className="btn-close"
+              title="Закрыть"
+              onClick={() => setSelectedTaskId(null)}
+            >
+              ✕
+            </button>
+          </header>
 
-            <p className="modal-description">
-              {selectedTask.description || 'Описание отсутствует'}
-            </p>
+          <p className="modal-description">
+            {selectedTask.description || 'Описание отсутствует'}
+          </p>
 
-            <div className="task-card-badges">
-              <span className={`badge priority-${selectedTask.priority}`}>
-                {PRIORITY_LABELS[selectedTask.priority] || selectedTask.priority}
-              </span>
-              <span className="badge badge-category">
-                {CATEGORY_LABELS[selectedTask.category] || selectedTask.category}
-              </span>
-            </div>
-
-            <footer className="modal-footer">
-              <select
-                className="status-select"
-                value={selectedTask.status}
-                onChange={(e) => handleStatusChange(selectedTask.id, e.target.value)}
-              >
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-              <div className="modal-dates">
-                <span>Срок: {selectedTask.dueDate ? formatDate(selectedTask.dueDate) : '—'}</span>
-                <span>Создана: {formatDate(selectedTask.createdAt)}</span>
-              </div>
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={() => handleDelete(selectedTask.id)}
-              >
-                Удалить задачу
-              </button>
-            </footer>
+          <div className="task-card-badges">
+            <span className={`badge priority-${selectedTask.priority}`}>
+              {PRIORITY_LABELS[selectedTask.priority] || selectedTask.priority}
+            </span>
+            <span className="badge badge-category">
+              {CATEGORY_LABELS[selectedTask.category] || selectedTask.category}
+            </span>
           </div>
-        </div>
+
+          <footer className="modal-footer">
+            <select
+              className="status-select"
+              value={selectedTask.status}
+              onChange={(e) => handleStatusChange(selectedTask.id, e.target.value)}
+            >
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <div className="modal-dates">
+              <span>Срок: {selectedTask.dueDate ? formatDate(selectedTask.dueDate) : '—'}</span>
+              {selectedTask.dueDate && (
+                <span>{formatDaysLeft(getDaysLeft(selectedTask.dueDate))}</span>
+              )}
+              <span>Создана: {formatDate(selectedTask.createdAt)}</span>
+            </div>
+            <button
+              type="button"
+              className="btn-danger"
+              onClick={() => handleDelete(selectedTask.id)}
+            >
+              Удалить задачу
+            </button>
+          </footer>
+        </aside>
       )}
 
       {isLogoutConfirmOpen && (

@@ -1,15 +1,15 @@
 :root {
-  --bg: #f4f5f7;
+  --bg: #f5f5f5;
   --surface: #ffffff;
-  --border: #e3e5ea;
-  --text: #1c1d21;
-  --text-muted: #71737c;
-  --accent: #4f46e5;
-  --accent-soft: #eef2ff;
+  --border: #e4e4e4;
+  --text: #161616;
+  --text-muted: #6f6f6f;
+  --accent: #161616;
+  --accent-soft: #efefef;
   --danger: #dc2626;
   --danger-soft: #fef2f2;
   --radius: 10px;
-  --shadow: 0 1px 2px rgba(28, 29, 33, 0.05), 0 4px 16px rgba(28, 29, 33, 0.06);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.06);
 
   font: 15px/1.55 system-ui, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
@@ -21,9 +21,7 @@ body {
 }
 
 #root {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 32px 16px;
+  padding: 24px 20px;
 }
 
 h1 {
@@ -61,7 +59,7 @@ textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.12);
 }
 
 button {
@@ -74,7 +72,7 @@ button {
 }
 
 button:hover {
-  background: #4338ca;
+  background: #000000;
 }
 
 button:focus-visible {
@@ -135,44 +133,340 @@ button:focus-visible {
 }
 
 .auth-page a {
-  color: var(--accent);
+  color: var(--text);
   font-weight: 500;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .auth-page a:hover {
-  text-decoration: underline;
+  color: #000000;
 }
 
 /* --- Страница задач --- */
 
-.tasks-header {
+.tasks-layout {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 20px;
+  align-items: flex-start;
+  /* компенсируем внутренние отступы #root, чтобы панель прилегала к краям экрана */
+  margin: -24px 0 -24px -20px;
 }
 
-.tasks-header-actions {
+.sidebar {
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 230px;
+  min-height: 100vh;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: margin-left 0.25s ease, opacity 0.2s ease;
+}
+
+.sidebar.collapsed {
+  margin-left: -230px; /* равно ширине панели */
+  opacity: 0;
+  pointer-events: none;
+}
+
+.btn-menu {
+  padding: 8px 11px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.sidebar h1 {
+  font-size: 20px;
+}
+
+.sidebar-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-filters h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.filter-field select,
+.filter-field input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
 .user-name {
+  color: var(--text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tasks-content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 0 24px 20px;
+}
+
+.content-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.found-count {
   color: var(--text-muted);
+  font-size: 14px;
+}
+
+.btn-add {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .tasks-layout {
+    flex-direction: column;
+    margin: -24px -20px 0;
+  }
+
+  .sidebar {
+    position: static;
+    width: 100%;
+    min-height: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tasks-content {
+    padding: 16px 20px 0;
+  }
+
+  .sidebar.collapsed {
+    display: none;
+    margin-left: 0;
+  }
+
+  .sidebar-footer {
+    margin-top: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.sort-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sort-label {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.sort-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-size: 14px;
   font-weight: 500;
 }
 
-.task-grid {
+.sort-chip:hover {
+  background: var(--surface);
+  color: var(--text);
+  border-color: #bdbdbd;
+}
+
+.sort-chip.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.sort-chip.active:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.sort-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sort-reset {
+  padding: 5px 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sort-reset:hover {
+  background: transparent;
+  color: var(--danger);
+}
+
+.kanban {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
+  align-items: start;
+}
+
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 240px;
+  padding: 10px;
+  background: #ececec;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.kanban-column.drag-over {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.kanban-column-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* растягиваем на всю ширину колонки, чтобы при прилипании перекрывать карточки */
+  margin: -10px -10px 0;
+  padding: 12px 16px;
+  background: #ececec;
+  border-radius: var(--radius) var(--radius) 0 0;
+  transition: background 0.15s ease;
+}
+
+.kanban-column.drag-over .kanban-column-header {
+  background: var(--accent-soft);
+}
+
+.kanban-column-header h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.kanban-count {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.kanban-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.kanban-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 20px 10px;
+  border: 1px dashed #c4c4c4;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  text-align: center;
+}
+
+.kanban-add {
+  padding: 6px;
+  background: transparent;
+  border: 1px dashed #c4c4c4;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.kanban-add:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .kanban {
+    grid-template-columns: 1fr;
+  }
 }
 
 .task-card {
+  cursor: grab;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -234,20 +528,23 @@ button:focus-visible {
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
+  white-space: pre-line;
   cursor: pointer;
 }
 
 .task-card-badges {
-  margin-top: auto;
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
 }
 
 .task-card-footer {
+  margin-top: auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
@@ -259,7 +556,6 @@ button:focus-visible {
   gap: 2px;
   font-size: 12.5px;
   color: var(--text-muted);
-  text-align: right;
 }
 
 .status-select {
@@ -291,9 +587,10 @@ button:focus-visible {
   color: #15803d;
 }
 
+/* Теги остаются цветными — не завязаны на монохромную палитру сайта */
 .badge-category {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: #eef2ff;
+  color: #4f46e5;
 }
 
 .empty-state {
@@ -339,6 +636,10 @@ button:focus-visible {
   box-shadow: 0 8px 40px rgba(23, 24, 28, 0.25);
 }
 
+.modal-confirm {
+  max-width: 400px;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -353,6 +654,12 @@ button:focus-visible {
   font-weight: 650;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.modal-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .modal-form {

@@ -21,6 +21,28 @@ const CATEGORY_LABELS = {
   general: 'Общее',
 };
 
+const SORT_LABELS = {
+  dueDate: 'Срок',
+  priority: 'Приоритет',
+  category: 'Категория',
+};
+
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
+
+const SORT_COMPARATORS = {
+  // Ближайший срок первым, задачи без срока — в конце
+  dueDate: (a, b) => {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return a.dueDate.localeCompare(b.dueDate);
+  },
+  priority: (a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3),
+  category: (a, b) =>
+    (CATEGORY_LABELS[a.category] || a.category)
+      .localeCompare(CATEGORY_LABELS[b.category] || b.category, 'ru'),
+};
+
 const formatDate = (value) => new Date(value).toLocaleDateString('ru-RU');
 
 const readStoredUser = () => {
@@ -38,16 +60,59 @@ export default function TasksPage() {
 
   const [tasks, setTasks] = useState([]);
   const [error, setError] = useState('');
+  const [sortKeys, setSortKeys] = useState([]);
+  const [filters, setFilters] = useState({ status: '', priority: '', category: '', dueBefore: '' });
+  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [dragOverStatus, setDragOverStatus] = useState(null);
 
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [createStatus, setCreateStatus] = useState('new');
   const [formError, setFormError] = useState('');
 
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
+
+  const toggleSortKey = (key) => {
+    setSortKeys((keys) =>
+      keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]
+    );
+  };
+
+  const updateFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const resetFilters = () => {
+    setFilters({ status: '', priority: '', category: '', dueBefore: '' });
+  };
+
+  const hasActiveFilters = Object.values(filters).some(Boolean);
+
+  // Категории для фильтра берём из реальных задач — на случай нестандартных значений
+  const knownCategories = [...new Set(tasks.map((task) => task.category))].sort((a, b) =>
+    (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b, 'ru')
+  );
+
+  const filteredTasks = tasks.filter((task) =>
+    (!filters.status || task.status === filters.status)
+    && (!filters.priority || task.priority === filters.priority)
+    && (!filters.category || task.category === filters.category)
+    && (!filters.dueBefore || (task.dueDate && task.dueDate <= filters.dueBefore))
+  );
+
+  // Сортировка стабильная: при равенстве по всем критериям сохраняется порядок сервера (новые первыми)
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    for (const key of sortKeys) {
+      const result = SORT_COMPARATORS[key](a, b);
+      if (result !== 0) return result;
+    }
+    return 0;
+  });
 
   const handleUnauthorized = () => {
     localStorage.removeItem('token');
@@ -83,10 +148,11 @@ export default function TasksPage() {
     loadTasks();
   }, []);
 
-  const openCreateModal = () => {
+  const openCreateModal = (status = 'new') => {
     setTitle('');
     setDescription('');
     setDueDate('');
+    setCreateStatus(status);
     setFormError('');
     setCreateOpen(true);
   };
@@ -101,7 +167,7 @@ export default function TasksPage() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ title, description, dueDate }),
+      body: JSON.stringify({ title, description, dueDate, status: createStatus }),
     });
 
     if (response.status === 401) {
@@ -153,6 +219,23 @@ export default function TasksPage() {
     loadTasks();
   };
 
+  const handleDragStart = (event, taskId) => {
+    event.dataTransfer.setData('text/plain', String(taskId));
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDrop = (event, status) => {
+    event.preventDefault();
+    setDragOverStatus(null);
+
+    const taskId = Number(event.dataTransfer.getData('text/plain'));
+    const task = tasks.find((t) => t.id === taskId);
+
+    if (task && task.status !== status) {
+      handleStatusChange(task.id, status);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -160,80 +243,208 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="tasks-page">
-      <header className="tasks-header">
+    <div className="tasks-layout">
+      <aside className={`sidebar${isSidebarOpen ? '' : ' collapsed'}`}>
         <h1>Мои задачи</h1>
-        <div className="tasks-header-actions">
+
+        <div className="sidebar-filters">
+          <h2>Фильтры</h2>
+          <label className="filter-field">
+            <span>Статус</span>
+            <select value={filters.status} onChange={(e) => updateFilter('status', e.target.value)}>
+              <option value="">Все</option>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>Приоритет</span>
+            <select value={filters.priority} onChange={(e) => updateFilter('priority', e.target.value)}>
+              <option value="">Все</option>
+              {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>Категория</span>
+            <select value={filters.category} onChange={(e) => updateFilter('category', e.target.value)}>
+              <option value="">Все</option>
+              {knownCategories.map((category) => (
+                <option key={category} value={category}>
+                  {CATEGORY_LABELS[category] || category}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>Срок до</span>
+            <input
+              type="date"
+              value={filters.dueBefore}
+              onChange={(e) => updateFilter('dueBefore', e.target.value)}
+            />
+          </label>
+          {hasActiveFilters && (
+            <button type="button" className="btn-ghost" onClick={resetFilters}>
+              Сбросить фильтры
+            </button>
+          )}
+        </div>
+
+        <div className="sidebar-footer">
           {user?.username && <span className="user-name">{user.username}</span>}
-          <button type="button" onClick={openCreateModal}>Добавить задачу</button>
-          <button type="button" className="btn-ghost" onClick={handleLogout}>Выйти</button>
+          <button type="button" onClick={() => setLogoutConfirmOpen(true)}>Выйти</button>
         </div>
-      </header>
+      </aside>
 
-      {error && <p className="error">{error}</p>}
-
-      {tasks.length === 0 ? (
-        <p className="empty-state">Задач пока нет — нажмите «Добавить задачу», чтобы создать первую.</p>
-      ) : (
-        <div className="task-grid">
-          {tasks.map((task) => (
-            <article className="task-card" key={task.id}>
-              <header className="task-card-header">
-                <h3 title="Открыть задачу" onClick={() => setSelectedTaskId(task.id)}>
-                  {task.title}
-                </h3>
-                <button
-                  type="button"
-                  className="btn-close"
-                  title="Удалить задачу"
-                  onClick={() => handleDelete(task.id)}
-                >
-                  ✕
+      <main className="tasks-content">
+        <div className="content-header">
+          <button
+            type="button"
+            className="btn-ghost btn-menu"
+            title={isSidebarOpen ? 'Скрыть панель' : 'Показать панель'}
+            onClick={() => setSidebarOpen((open) => !open)}
+          >
+            ☰
+          </button>
+          {tasks.length > 0 && (
+            <div className="sort-bar" title="Порядок нажатия определяет важность критерия">
+              <span className="sort-label">Сортировка:</span>
+              {Object.entries(SORT_LABELS).map(([key, label]) => {
+                const position = sortKeys.indexOf(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`sort-chip${position !== -1 ? ' active' : ''}`}
+                    onClick={() => toggleSortKey(key)}
+                  >
+                    {label}
+                    {position !== -1 && <span className="sort-order">{position + 1}</span>}
+                  </button>
+                );
+              })}
+              {sortKeys.length > 0 && (
+                <button type="button" className="sort-reset" onClick={() => setSortKeys([])}>
+                  Сбросить
                 </button>
-              </header>
-
-              <p
-                className="task-card-description"
-                title="Открыть задачу"
-                onClick={() => setSelectedTaskId(task.id)}
-              >
-                {task.description || 'Описание отсутствует'}
-              </p>
-
-              <div className="task-card-badges">
-                <span className={`badge priority-${task.priority}`}>
-                  {PRIORITY_LABELS[task.priority] || task.priority}
-                </span>
-                <span className="badge badge-category">
-                  {CATEGORY_LABELS[task.category] || task.category}
-                </span>
-              </div>
-
-              <footer className="task-card-footer">
-                <select
-                  className="status-select"
-                  value={task.status}
-                  onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                >
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-                <div className="task-card-dates">
-                  <span>Срок: {task.dueDate ? formatDate(task.dueDate) : '—'}</span>
-                  <span>Создана: {formatDate(task.createdAt)}</span>
-                </div>
-              </footer>
-            </article>
-          ))}
+              )}
+            </div>
+          )}
+          {hasActiveFilters && tasks.length > 0 && (
+            <span className="found-count">Найдено: {sortedTasks.length}</span>
+          )}
+          <button type="button" className="btn-add" onClick={() => openCreateModal()}>
+            Добавить задачу
+          </button>
         </div>
-      )}
+
+        {error && <p className="error">{error}</p>}
+
+        {tasks.length === 0 ? (
+          <p className="empty-state">Задач пока нет — нажмите «Добавить задачу», чтобы создать первую.</p>
+        ) : sortedTasks.length === 0 ? (
+          <p className="empty-state">По выбранным фильтрам ничего не найдено.</p>
+        ) : (
+          <div className="kanban">
+            {Object.entries(STATUS_LABELS).map(([status, statusLabel]) => {
+              const columnTasks = sortedTasks.filter((task) => task.status === status);
+              return (
+                <section
+                  key={status}
+                  className={`kanban-column${dragOverStatus === status ? ' drag-over' : ''}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOverStatus(status);
+                  }}
+                  onDragLeave={() => {
+                    setDragOverStatus((current) => (current === status ? null : current));
+                  }}
+                  onDrop={(e) => handleDrop(e, status)}
+                >
+                  <header className="kanban-column-header">
+                    <h2>{statusLabel}</h2>
+                    <span className="kanban-count">{columnTasks.length}</span>
+                  </header>
+
+                  <div className="kanban-cards">
+                    {columnTasks.map((task) => (
+                      <article
+                        className="task-card"
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                      >
+                        <header className="task-card-header">
+                          <h3 title="Открыть задачу" onClick={() => setSelectedTaskId(task.id)}>
+                            {task.title}
+                          </h3>
+                          <button
+                            type="button"
+                            className="btn-close"
+                            title="Удалить задачу"
+                            onClick={() => handleDelete(task.id)}
+                          >
+                            ✕
+                          </button>
+                        </header>
+
+                        <p
+                          className="task-card-description"
+                          title="Открыть задачу"
+                          onClick={() => setSelectedTaskId(task.id)}
+                        >
+                          {task.description || 'Описание отсутствует'}
+                        </p>
+
+                        <footer className="task-card-footer">
+                          <div className="task-card-dates">
+                            <span>Срок: {task.dueDate ? formatDate(task.dueDate) : '—'}</span>
+                            <span>Создана: {formatDate(task.createdAt)}</span>
+                          </div>
+                          <div className="task-card-badges">
+                            <span className={`badge priority-${task.priority}`}>
+                              {PRIORITY_LABELS[task.priority] || task.priority}
+                            </span>
+                            <span className="badge badge-category">
+                              {CATEGORY_LABELS[task.category] || task.category}
+                            </span>
+                          </div>
+                        </footer>
+                      </article>
+                    ))}
+                    {columnTasks.length === 0 && (
+                      <p className="kanban-empty">Перетащите задачу сюда</p>
+                    )}
+                  </div>
+
+                  {status !== 'done' && (
+                    <button
+                      type="button"
+                      className="kanban-add"
+                      title={`Добавить задачу в «${statusLabel}»`}
+                      onClick={() => openCreateModal(status)}
+                    >
+                      +
+                    </button>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </main>
 
       {isCreateOpen && (
         <div className="modal-overlay" onClick={() => setCreateOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <header className="modal-header">
-              <h2>Новая задача</h2>
+              <div>
+                <h2>Новая задача</h2>
+                <p className="modal-subtitle">Колонка: {STATUS_LABELS[createStatus]}</p>
+              </div>
               <button
                 type="button"
                 className="btn-close"
@@ -323,6 +534,33 @@ export default function TasksPage() {
               >
                 Удалить задачу
               </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {isLogoutConfirmOpen && (
+        <div className="modal-overlay" onClick={() => setLogoutConfirmOpen(false)}>
+          <div className="modal modal-confirm" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2>Выход</h2>
+              <button
+                type="button"
+                className="btn-close"
+                title="Закрыть"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                ✕
+              </button>
+            </header>
+
+            <p className="modal-description">Вы действительно хотите выйти из аккаунта?</p>
+
+            <footer className="modal-footer">
+              <button type="button" className="btn-ghost" onClick={() => setLogoutConfirmOpen(false)}>
+                Отмена
+              </button>
+              <button type="button" onClick={handleLogout}>Выйти</button>
             </footer>
           </div>
         </div>

@@ -23,20 +23,35 @@ const CATEGORY_LABELS = {
 
 const formatDate = (value) => new Date(value).toLocaleDateString('ru-RU');
 
+const readStoredUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('user'));
+  } catch {
+    return null;
+  }
+};
+
 export default function TasksPage() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const [user] = useState(readStoredUser);
 
   const [tasks, setTasks] = useState([]);
   const [error, setError] = useState('');
-  const [expandedTaskId, setExpandedTaskId] = useState(null);
+
+  const [isCreateOpen, setCreateOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [formError, setFormError] = useState('');
+
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
   const handleUnauthorized = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/login');
   };
 
@@ -68,9 +83,17 @@ export default function TasksPage() {
     loadTasks();
   }, []);
 
+  const openCreateModal = () => {
+    setTitle('');
+    setDescription('');
+    setDueDate('');
+    setFormError('');
+    setCreateOpen(true);
+  };
+
   const handleCreate = async (event) => {
     event.preventDefault();
-    setError('');
+    setFormError('');
 
     const response = await fetch(`${API_URL}/tasks`, {
       method: 'POST',
@@ -89,13 +112,11 @@ export default function TasksPage() {
     const data = await response.json();
 
     if (!response.ok) {
-      setError(data.message);
+      setFormError(data.message);
       return;
     }
 
-    setTitle('');
-    setDescription('');
-    setDueDate('');
+    setCreateOpen(false);
     loadTasks();
   };
 
@@ -128,11 +149,13 @@ export default function TasksPage() {
       return;
     }
 
+    setSelectedTaskId(null);
     loadTasks();
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/login');
   };
 
@@ -140,45 +163,25 @@ export default function TasksPage() {
     <div className="tasks-page">
       <header className="tasks-header">
         <h1>Мои задачи</h1>
-        <button type="button" className="btn-ghost" onClick={handleLogout}>Выйти</button>
+        <div className="tasks-header-actions">
+          {user?.username && <span className="user-name">{user.username}</span>}
+          <button type="button" onClick={openCreateModal}>Добавить задачу</button>
+          <button type="button" className="btn-ghost" onClick={handleLogout}>Выйти</button>
+        </div>
       </header>
-
-      <form className="task-form" onSubmit={handleCreate}>
-        <input
-          type="text"
-          placeholder="Название задачи"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Описание"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Срок выполнения"
-          title="Срок задачи"
-          value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
-          onFocus={(e) => { e.target.type = 'date'; }}
-          onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
-        />
-        <button type="submit">Добавить</button>
-      </form>
 
       {error && <p className="error">{error}</p>}
 
       {tasks.length === 0 ? (
-        <p className="empty-state">Задач пока нет — добавьте первую в форме выше.</p>
+        <p className="empty-state">Задач пока нет — нажмите «Добавить задачу», чтобы создать первую.</p>
       ) : (
         <div className="task-grid">
           {tasks.map((task) => (
             <article className="task-card" key={task.id}>
               <header className="task-card-header">
-                <h3>{task.title}</h3>
+                <h3 title="Открыть задачу" onClick={() => setSelectedTaskId(task.id)}>
+                  {task.title}
+                </h3>
                 <button
                   type="button"
                   className="btn-close"
@@ -190,9 +193,9 @@ export default function TasksPage() {
               </header>
 
               <p
-                className={`task-card-description${expandedTaskId === task.id ? ' expanded' : ''}`}
-                title="Показать описание полностью"
-                onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                className="task-card-description"
+                title="Открыть задачу"
+                onClick={() => setSelectedTaskId(task.id)}
               >
                 {task.description || 'Описание отсутствует'}
               </p>
@@ -223,6 +226,105 @@ export default function TasksPage() {
               </footer>
             </article>
           ))}
+        </div>
+      )}
+
+      {isCreateOpen && (
+        <div className="modal-overlay" onClick={() => setCreateOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2>Новая задача</h2>
+              <button
+                type="button"
+                className="btn-close"
+                title="Закрыть"
+                onClick={() => setCreateOpen(false)}
+              >
+                ✕
+              </button>
+            </header>
+
+            <form className="modal-form" onSubmit={handleCreate}>
+              <input
+                type="text"
+                placeholder="Название задачи"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+              <textarea
+                rows={4}
+                placeholder="Описание"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Срок выполнения"
+                title="Срок задачи"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                onFocus={(e) => { e.target.type = 'date'; }}
+                onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+              />
+              {formError && <p className="error">{formError}</p>}
+              <button type="submit">Добавить</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {selectedTask && (
+        <div className="modal-overlay" onClick={() => setSelectedTaskId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2>{selectedTask.title}</h2>
+              <button
+                type="button"
+                className="btn-close"
+                title="Закрыть"
+                onClick={() => setSelectedTaskId(null)}
+              >
+                ✕
+              </button>
+            </header>
+
+            <p className="modal-description">
+              {selectedTask.description || 'Описание отсутствует'}
+            </p>
+
+            <div className="task-card-badges">
+              <span className={`badge priority-${selectedTask.priority}`}>
+                {PRIORITY_LABELS[selectedTask.priority] || selectedTask.priority}
+              </span>
+              <span className="badge badge-category">
+                {CATEGORY_LABELS[selectedTask.category] || selectedTask.category}
+              </span>
+            </div>
+
+            <footer className="modal-footer">
+              <select
+                className="status-select"
+                value={selectedTask.status}
+                onChange={(e) => handleStatusChange(selectedTask.id, e.target.value)}
+              >
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+              <div className="modal-dates">
+                <span>Срок: {selectedTask.dueDate ? formatDate(selectedTask.dueDate) : '—'}</span>
+                <span>Создана: {formatDate(selectedTask.createdAt)}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={() => handleDelete(selectedTask.id)}
+              >
+                Удалить задачу
+              </button>
+            </footer>
+          </div>
         </div>
       )}
     </div>

@@ -1,58 +1,26 @@
-from datetime import datetime
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from sentence_transformers import SentenceTransformer, util
 
-app = FastAPI(title="Task Analysis Service")
+from category import detect_category, warmup
+from priority import detect_priority, strip_schedule_words
 
-MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
-model = SentenceTransformer(MODEL_NAME)
 
-CATEGORY_PROTOTYPES = {
-    "business": [
-        "подготовить презентацию для клиента",
-        "деловая встреча с партнёрами",
-        "отчёт для руководства",
-        "переговоры с поставщиком",
-    ],
-    "study": [
-        "изучить новую тему",
-        "пройти онлайн-курс",
-        "прочитать документацию",
-        "сделать домашнее задание",
-    ],
-    "personal": [
-        "купить продукты",
-        "записаться к врачу",
-        "убраться дома",
-        "заняться спортом",
-    ],
-    "general": [
-        "сделать задачу",
-        "разобраться с делами",
-    ],
-}
-CATEGORY_THRESHOLD = 0.3
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # прогреваем модель до приёма запросов, чтобы первый /analyze
+    # не упирался в её загрузку (и в 3-секундный таймаут backend'а)
+    warmup()
+    yield
 
-_category_embeddings = {
-    category: model.encode(phrases, convert_to_tensor=True)
-    for category, phrases in CATEGORY_PROTOTYPES.items()
-}
 
-URGENT_KEYWORDS = [
-    "срочно", "срочный", "немедленно", "asap", "критично", "критически", "горит",
-]
+app = FastAPI(title="Task Analysis Service", lifespan=lifespan)
 
-WEEKDAY_STEMS = {
-    "понедельник": 0,
-    "вторник": 1,
-    "сред": 2,
-    "четверг": 3,
-    "пятниц": 4,
-    "суббот": 5,
-    "воскресень": 6,
-}
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 class AnalyzeRequest(BaseModel):
@@ -63,45 +31,7 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeResponse(BaseModel):
     priority: str
     category: str
-
-
-def detect_category(text: str) -> str:
-    if not text:
-        return "general"
-
-    embedding = model.encode(text, convert_to_tensor=True)
-    best_category = "general"
-    best_score = CATEGORY_THRESHOLD
-
-    for category, proto_embeddings in _category_embeddings.items():
-        score = util.cos_sim(embedding, proto_embeddings).max().item()
-        if score > best_score:
-            best_score = score
-            best_category = category
-
-    return best_category
-
-
-def _days_until_weekday(target_weekday: int) -> int:
-    today = datetime.now().weekday()
-    delta = (target_weekday - today) % 7
-    return delta if delta != 0 else 7
-
-
-def detect_priority(text: str) -> str:
-    lowered = text.lower()
-
-    if any(keyword in lowered for keyword in URGENT_KEYWORDS):
-        return "high"
-
-    if "сегодня" in lowered or "завтра" in lowered:
-        return "high"
-
-    for stem, weekday in WEEKDAY_STEMS.items():
-        if stem in lowered:
-            return "high" if _days_until_weekday(weekday) <= 2 else "medium"
-
-    return "medium"
+    confidence: float
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
@@ -111,9 +41,12 @@ def analyze(payload: AnalyzeRequest) -> AnalyzeResponse:
         raise HTTPException(status_code=400, detail="Текст задачи пустой")
 
     try:
+        # даты и слова срочности — сигнал для приоритета, но шум для категории
+        category, confidence = detect_category(strip_schedule_words(text))
         return AnalyzeResponse(
             priority=detect_priority(text),
-            category=detect_category(text),
+            category=category,
+            confidence=confidence,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Ошибка анализа текста: {exc}") from exc

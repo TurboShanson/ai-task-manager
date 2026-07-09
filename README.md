@@ -92,7 +92,7 @@ CREATE DATABASE task_manager;
 Создайте файл `backend/.env`:
 
 ```env
-DB_USERNAME=postgres (или иной пользователь postgres)
+DB_USERNAME=postgres
 DB_PASSWORD=ваш_пароль_от_PostgreSQL
 DB_NAME=task_manager
 DB_HOST=localhost

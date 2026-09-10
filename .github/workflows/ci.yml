@@ -1,0 +1,45 @@
+name: CI Pipeline  # Название пайплайна
+
+on:
+  # Эти события запускают пайплайн
+  push:
+    branches: [main]          # при каждом push в ветку main
+  pull_request:
+    branches: [main]          # при каждом pull request в main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest    # ОС, на которой выполняется пайплайн
+
+    defaults:
+      run:
+        working-directory: analysis-service  # сервис лежит в подпапке — все команды выполняются в ней
+
+    steps:
+      # 1. Скачиваем исходный код репозитория
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Ставим Python 3.11 для запуска тестов
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 3. Устанавливаем зависимости сервиса
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4. Запускаем модульные тесты (pytest)
+      - name: Run tests
+        run: pytest
+
+      # 5. Готовим Docker для сборки образа
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 6. Собираем Docker-образ сервиса (проверяем, что контейнер собирается)
+      - name: Build Docker image
+        run: docker build -t analysis-service:ci .

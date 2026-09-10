@@ -1,0 +1,19 @@
+# Кэш и скомпилированные файлы Python
+__pycache__
+*.pyc
+.pytest_cache
+
+# Виртуальное окружение — оно не нужно в контейнере
+venv/
+env/
+
+# Тесты в образ не копируем (они нужны только для CI)
+tests/
+conftest.py
+
+# Файлы с секретами
+*.env
+
+# Сам Dockerfile и служебные файлы
+Dockerfile
+.dockerignore

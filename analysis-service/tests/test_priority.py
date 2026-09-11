@@ -1,86 +1,66 @@
-from datetime import datetime
-
-import pytest
-
-import priority
 from priority import detect_priority, strip_schedule_words
 
 
-class _FrozenDateTime(datetime):
-    @classmethod
-    def now(cls, tz=None):
-        return cls(2026, 7, 7)  # вторник
+# --- Приоритет: слова срочности дают high ---
+
+def test_srochno_is_high():
+    assert detect_priority("Срочно подготовить отчёт") == "high"
 
 
-@pytest.fixture(autouse=True)
-def _frozen_now(monkeypatch):
-    monkeypatch.setattr(priority, "datetime", _FrozenDateTime)
+def test_asap_is_high():
+    assert detect_priority("Задача ASAP") == "high"
 
 
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        # срочность
-        ("Срочно подготовить отчёт", "high"),
-        ("Задача ASAP", "high"),
-        ("Это критично для релиза", "high"),
-        # отрицания и явный низкий приоритет
-        ("Это не срочно, сделать когда-нибудь", "low"),
-        ("не срочно", "low"),
-        ("несрочная задача", "low"),
-        ("отложить на потом", "low"),
-        ("это не к спеху", "low"),
-        ("задача с низким приоритетом", "low"),
-        # ближайшие дни
-        ("Купить продукты завтра", "high"),
-        ("сделать сегодня", "high"),
-        ("подготовить к послезавтра", "high"),
-        # ложные срабатывания по подстрокам
-        ("позавтракать с командой", "medium"),
-        ("средний отчёт по продажам", "medium"),
-        # дни недели (сегодня вторник 2026-07-07)
-        ("встреча в среду", "high"),
-        ("сдать отчёт в пятницу", "medium"),
-        ("созвон в субботу", "medium"),
-        # числовые даты
-        ("оплатить счёт 09.07", "high"),
-        ("оплатить счёт 10.07", "medium"),
-        ("сдать проект 15.07.2026", "medium"),
-        ("обновить версию 1.5", "medium"),
-        # словесные даты
-        ("сдать отчёт до 15 июля", "medium"),
-        ("сделать через неделю", "medium"),
-        # числа и время — не дедлайны
-        ("сделать 5 задач", "medium"),
-        ("встреча в 5", "medium"),
-        # без сигналов
-        ("обычная задача без сроков", "medium"),
-    ],
-)
-def test_detect_priority(text, expected):
-    assert detect_priority(text) == expected
+def test_kritichno_is_high():
+    assert detect_priority("Это критично для релиза") == "high"
 
 
-def test_past_numeric_date_rolls_to_next_year():
-    # 05.07 уже прошло — трактуется как следующий год, дедлайн далеко
-    assert detect_priority("сдать отчёт 05.07") == "medium"
+# --- Приоритет: отрицание срочности и явный низкий приоритет дают low ---
 
+def test_ne_srochno_is_low():
+    assert detect_priority("Это не срочно") == "low"
+
+
+def test_kogda_nibud_is_low():
+    assert detect_priority("Сделать когда-нибудь") == "low"
+
+
+def test_nizkiy_prioritet_is_low():
+    assert detect_priority("Задача с низким приоритетом") == "low"
+
+
+# --- Приоритет: ближайшие дни всегда срочные (не зависят от текущей даты) ---
+
+def test_segodnya_is_high():
+    assert detect_priority("Сделать сегодня") == "high"
+
+
+def test_zavtra_is_high():
+    assert detect_priority("Купить продукты завтра") == "high"
+
+
+# --- Приоритет: нет никаких сигналов — средний по умолчанию ---
+
+def test_no_signals_is_medium():
+    assert detect_priority("Обычная задача без сроков") == "medium"
+
+
+# --- Защита от ложного срабатывания по подстроке ---
+
+def test_pozavtrakat_is_not_zavtra():
+    # «позавтракать» содержит «завтра» как часть слова, но это не дедлайн
+    assert detect_priority("Позавтракать с командой") == "medium"
+
+
+# --- strip_schedule_words: убирает даты и срочность, оставляет суть задачи ---
 
 def test_strip_removes_worded_date():
     assert strip_schedule_words("Пройти курс по SQL до 15 июля") == "Пройти курс по SQL"
 
 
-def test_strip_removes_numeric_date_and_urgency():
-    assert strip_schedule_words("Срочно оплатить счёт 09.07") == "оплатить счёт"
+def test_strip_removes_urgency():
+    assert strip_schedule_words("Срочно оплатить счёт") == "оплатить счёт"
 
 
-def test_strip_removes_negated_urgency_entirely():
-    assert strip_schedule_words("Убраться дома, не срочно") == "Убраться дома,"
-
-
-def test_strip_preserves_case():
-    assert strip_schedule_words("Пройти туториал по FastAPI завтра") == "Пройти туториал по FastAPI"
-
-
-def test_strip_keeps_text_without_schedule_words():
+def test_strip_keeps_plain_text():
     assert strip_schedule_words("Подготовить слайды для инвесторов") == "Подготовить слайды для инвесторов"

@@ -1,4 +1,4 @@
-name: CI Pipeline  # Название пайплайна
+name: CI/CD Pipeline  # Название пайплайна
 
 on:
   # Эти события запускают пайплайн
@@ -8,14 +8,20 @@ on:
     branches: [main]          # при каждом pull request в main
 
 jobs:
-  build-and-test:
+  build-test-deploy:
     runs-on: ubuntu-latest    # ОС, на которой выполняется пайплайн
+
+    env:
+      # Имя образа на Docker Hub: <логин>/<репозиторий>
+      IMAGE_NAME: turboshanson1488/analysis-service
 
     defaults:
       run:
         working-directory: analysis-service  # сервис лежит в подпапке — все команды выполняются в ней
 
     steps:
+      # ==================== CI: проверка и сборка ====================
+
       # 1. Скачиваем исходный код репозитория
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,14 +38,38 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Запускаем модульные тесты (pytest)
+      # 4. Запускаем тесты (pytest)
       - name: Run tests
         run: pytest
 
-      # 5. Готовим Docker для сборки образа
-      - name: Set up Docker Buildx
+      # 5. Устанавливаем Docker (Buildx) для сборки образа
+      - name: Set up Docker
         uses: docker/setup-buildx-action@v3
 
-      # 6. Собираем Docker-образ сервиса (проверяем, что контейнер собирается)
+      # 6. Собираем образ с двумя тегами: по хешу коммита и latest
+      #    GITHUB_SHA::8 — первые 8 символов хеша коммита
       - name: Build Docker image
-        run: docker build -t analysis-service:ci .
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_NAME }}:${GITHUB_SHA::8} \
+            -t ${{ env.IMAGE_NAME }}:latest \
+            .
+
+      # ==================== CD: публикация образа в Docker Hub ====================
+      # CD-шаги работают только при push в main (не на pull request),
+      # чтобы образ публиковался лишь после попадания кода в основную ветку.
+
+      # 7. Логинимся в Docker Hub секретным токеном из настроек репозитория
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: turboshanson1488
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      # 8. Публикуем образ в Docker Hub (оба тега)
+      - name: Push image to Docker Hub
+        if: github.event_name == 'push'
+        run: |
+          docker push ${{ env.IMAGE_NAME }}:${GITHUB_SHA::8}
+          docker push ${{ env.IMAGE_NAME }}:latest
